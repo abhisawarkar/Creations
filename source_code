@@ -1,0 +1,321 @@
+#!/usr/bin/python
+import socket
+import sys
+import re
+import math
+import ssl
+from _ssl import CERT_NONE
+
+
+
+# Calculates number of arguments on command line and assign it to variable "num".
+
+a=len(sys.argv)
+
+num=int(a)
+
+# Let 'b' be a list with possible strings that can be passed as arguments i.e. cs5700sp15.ccs.neu.edu, -s,-p.
+# Check if there is any argument which is not in a possible string. If argument is a possible string, assign "d" as 1.
+# If argument is not a possible string; check if the argument is a number or not.
+# If a number is detected, assign "d" as 1. Else assign "d" as 2.
+
+
+b=['cs5700sp15.ccs.neu.edu','-s','-p']
+
+for i in range(1,a):
+
+	if sys.argv[i] not in b:
+
+		if (sys.argv[i]).isdigit() == True:
+
+			d = 1
+
+		else:
+
+			d = 2
+			break
+
+	else:
+		d=1
+
+
+
+# Check if any invalid argument was passed on the command line by checking the value from pervious commands.
+# If "d" is 2, it raises an exception for invalid argument and exits system. 
+
+if d == 2:
+	
+	print "\nException raised: Invalid argument passed\n"
+	sys.exit()
+
+else:
+
+	d=1
+		
+
+
+# Checks NEU ID for valid length and integer value else raise an exception that NEU ID is not valid.
+# If NEU ID is valid, it checks for validity of hostname. 
+# If valid hostname, assigns length of string to variable "num" else raises an exception that Hostname not valid.
+# If any case of exception raised, it exits the system.
+
+
+if len(sys.argv[a-1]) == 9 and (sys.argv[a-1]).isdigit() == True:
+
+	if sys.argv[a-2] == "cs5700sp15.ccs.neu.edu":
+
+		num=a
+
+	else:
+		print"\nException raised: Hostname not valid.\n"
+		sys.exit()
+
+else:
+	print "\nExcpetion raised: NEU ID not valid.\n"
+	sys.exit()
+
+
+# Assigns variable host to hostname.	
+
+host=sys.argv[a-2]
+
+
+
+# Try to resovle IP address by using hostname. If not found, rasises an exception of not resolved and exits system.
+
+s=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+
+try:
+	IP_address=socket.gethostbyname(host)
+	
+except:
+
+	print("\nException raised: Not resolved\n")
+	sys.exit()
+
+
+
+# Checks the list of arguments for '-p'. If not found, decreaments the value of variable "num" each time.
+# If '-p' found, checks if the next argument is an integer(port number). If not integer, Exception raised that no port is defined.
+# If the next argument is an integer, check its port number.
+# If port = 27994, run with ssl. 
+# If '-s' in argument list and port is 27994; run with ssl. 
+# If '-s' in argument list and port is not 27994; assign "f" as 1.
+# If "f" is 1, try running SSL with given port number.
+# If not connected with SSL, raise exception that SSL connenction cannot be established on this port and exit system.
+# If '-s' in not in argument list. Try connecting with given port number. 
+# If not connected, raise exception that connenction cannot be established on designated port and it exits the system.
+
+
+for i in range(0,a-1):
+	
+	f=0
+
+	if sys.argv[i] == '-p':
+
+		if (sys.argv[i+1]).isdigit() == True:		
+			
+			port_num = int(sys.argv[i+1]) 	
+
+			if port_num == 27994:
+
+				s=ssl.wrap_socket(s,cert_reqs=CERT_NONE)
+				s.connect((IP_address,port_num))
+				break
+
+			else:
+				for i in range(1,a-1):	 
+
+					if sys.argv[i] == '-s':
+
+						if port_num == 27994: 
+			
+							s=ssl.wrap_socket(s,cert_reqs=CERT_NONE)
+							s.connect((IP_address,port_num))
+							break
+
+						else:					
+							f=1
+				
+				if f == 1:
+					
+					try:
+						s=ssl.wrap_socket(s,cert_reqs=CERT_NONE)
+						s.connect((IP_address,port_num))
+						break
+
+					except:
+
+						print "\nException raised: SSL Connenction cannot be established on this port\n"
+						sys.exit()
+
+
+				try:	
+
+					s.connect((IP_address,port_num))
+					break
+			
+				except:
+
+					print "\nException raised: Connenction cannot be established on designated port\n"
+					sys.exit()
+
+		else:
+
+			print "\nException raised: No port defined.\n"
+			sys.exit()
+
+	else:	
+		num=num-1
+
+
+
+# Checks if '-p' was not found in list of arguments, comparing value of variable num to 1.
+# Checks for '-s' in list of arguments. If not found, assigns port as default value of 27993 and runs without ssl.
+# If '-s' is found, assigns port as 27994 and runs with ssl.
+
+
+if num == 1:
+
+	for i in range(1,a-1):	 
+
+		if sys.argv[i] == '-s': 
+
+			port_num=27994		
+			s=ssl.wrap_socket(s,cert_reqs=CERT_NONE)
+			s.connect((IP_address,port_num))
+			break
+
+		else:
+			port_num=27993
+			s.connect((IP_address,port_num))
+
+
+
+# Connect to server through socket using the resolved IP address and intended port number.
+
+
+#s.connect((IP_address,port_num))
+
+
+
+# Creates message as mentioned. Appends the HELLO string with the NEU ID. 
+
+y="cs5700spring2015 HELLO 00"
+
+z='%s%d' % (y,int(sys.argv[a-1]))
+
+msg_hello ='%s%s' % (z,'\n')
+
+
+
+# Try to send message. If not send, it prints "Send failed" and exits system.
+
+
+try:
+	s.sendall(msg_hello)
+
+except socket.error:
+
+	print('Send failed')
+	sys.exit()
+
+
+
+# Recieves a reply from socket, splits the recieved strings and stores the split strings in list "a".
+
+reply_hello=s.recv(1024)
+
+a=reply_hello.split(" ")
+
+
+
+# Let variable "i" be 1. Till the time  value of "i" is 1, run the while loop.
+# Extract and convert numbers in recieved string to integers.
+# Check if 1st and 2nd integers are in valid range; else raise exception as integer not in valid range.
+# Check for mentioned operator by comparison and compute the integers with fetched operator.
+# If fetched operator is not matched, raises an exception for incorrect operator.
+
+
+i = 1
+
+while i == 1:
+
+	a1 = int(a[2])
+	a2 = int(a[4])
+
+	if a1 >= 0 and a1 <= 1000:
+
+		if a2 >= 0 and a2 <= 1000:
+
+			if a[3] == '+':
+				c = a1+a2
+
+			elif a[3] == '-':
+				c = a1-a2	
+
+			elif a[3] == '/':
+				c = float(a1)/float(a2)
+				c = int(c)		
+
+			elif a[3] == '*':
+				c = a1*a2
+
+			else:
+				print "\nExcpetion raised: Incorrect operator.\n"
+
+		else:
+			print "\n2nd integer is not in valid range of vlaues.\n"
+
+	else:
+		print "\n1st integer is not in valid range of vlaues.\n"
+
+
+
+
+# Create a message reply as mentioned string by appending the solution as string. 
+
+
+	url = "cs5700spring2015 "
+
+	f = '%s%d' % (url,c)
+
+	msg_solution = '%s%s' % (f,'\n')	
+
+
+
+# Try to send message reply through socket. If not sent, raise exception as send failed and exits system.
+
+
+	try:
+		s.sendall(msg_solution)
+
+	except socket.error:
+
+		print('Send failed')
+		sys.exit()
+
+
+
+# Recieves the reply from server. It splits the reply and save in a list "a".
+# If recieved message has 'Unknown_Husky_ID' string, it changes value of variable "i" to 2 and comes out of while loop.
+# If recieved message has 'BYE' as string in the 3rd argument, value of variable "i" becomes 3 and hence exits while loop. 
+# If Unknown_Husky_ID and 'BYE' not as 3rd argument, then "i" is 1 and runs again in while loop.
+
+
+	reply_solution=s.recv(1024)
+	a=reply_solution.split(" ")
+
+	if a[1] in ['Unknown_Husky_ID']:
+
+		i=2	
+		print "\nException raised: Unknown Husky ID\n"
+ 
+	elif a[2] in ['BYE\n','bye\n']:
+
+		i=3
+		print "%s" % (a[1])		
+		s.close() 
+
+	else:
+		i=1
